@@ -12,6 +12,7 @@ import {
   IconX,
   IconSearch,
   IconClipboardSmileFilled,
+  IconCodeCircle2,
 } from '@tabler/icons-react'
 import { route } from '@/constants/routes'
 import ThreadList from './ThreadList'
@@ -40,6 +41,12 @@ const mainMenus = [
     title: 'common:newChat',
     icon: IconCirclePlusFilled,
     route: route.home,
+    isEnabled: true,
+  },
+  {
+    title: 'common:bsp',
+    icon: IconCodeCircle2,
+    route: route.bsp,
     isEnabled: true,
   },
   {
@@ -431,7 +438,11 @@ const LeftPanel = () => {
                       : '[&.active]:bg-left-panel-fg/10'
                   )}
                 >
-                  <menu.icon size={18} className="text-left-panel-fg/70" />
+                  {menu.title === 'common:bsp' ? (
+                    <span className="text-lg">🛝</span>
+                  ) : (
+                    <menu.icon size={18} className="text-left-panel-fg/70" />
+                  )}
                   <span className="font-medium text-left-panel-fg/90">
                     {t(menu.title)}
                   </span>
