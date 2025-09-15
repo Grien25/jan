@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as SystemMonitorImport } from './routes/system-monitor'
 import { Route as LogsImport } from './routes/logs'
+import { Route as BspImport } from './routes/bsp'
 import { Route as AssistantImport } from './routes/assistant'
 import { Route as IndexImport } from './routes/index'
 import { Route as HubIndexImport } from './routes/hub/index'
@@ -42,6 +43,12 @@ const SystemMonitorRoute = SystemMonitorImport.update({
 const LogsRoute = LogsImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const BspRoute = BspImport.update({
+  id: '/bsp',
+  path: '/bsp',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -164,6 +171,13 @@ declare module '@tanstack/react-router' {
       path: '/assistant'
       fullPath: '/assistant'
       preLoaderRoute: typeof AssistantImport
+      parentRoute: typeof rootRoute
+    }
+    '/bsp': {
+      id: '/bsp'
+      path: '/bsp'
+      fullPath: '/bsp'
+      preLoaderRoute: typeof BspImport
       parentRoute: typeof rootRoute
     }
     '/logs': {
@@ -293,6 +307,7 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/bsp': typeof BspRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
@@ -315,6 +330,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/bsp': typeof BspRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
@@ -338,6 +354,7 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/bsp': typeof BspRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
@@ -362,6 +379,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/assistant'
+    | '/bsp'
     | '/logs'
     | '/system-monitor'
     | '/hub/$modelId'
@@ -383,6 +401,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/assistant'
+    | '/bsp'
     | '/logs'
     | '/system-monitor'
     | '/hub/$modelId'
@@ -404,6 +423,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/assistant'
+    | '/bsp'
     | '/logs'
     | '/system-monitor'
     | '/hub/$modelId'
@@ -427,6 +447,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistantRoute: typeof AssistantRoute
+  BspRoute: typeof BspRoute
   LogsRoute: typeof LogsRoute
   SystemMonitorRoute: typeof SystemMonitorRoute
   HubModelIdRoute: typeof HubModelIdRoute
@@ -449,6 +470,7 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistantRoute: AssistantRoute,
+  BspRoute: BspRoute,
   LogsRoute: LogsRoute,
   SystemMonitorRoute: SystemMonitorRoute,
   HubModelIdRoute: HubModelIdRoute,
@@ -480,6 +502,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/assistant",
+        "/bsp",
         "/logs",
         "/system-monitor",
         "/hub/$modelId",
@@ -504,6 +527,9 @@ export const routeTree = rootRoute
     },
     "/assistant": {
       "filePath": "assistant.tsx"
+    },
+    "/bsp": {
+      "filePath": "bsp.tsx"
     },
     "/logs": {
       "filePath": "logs.tsx"
