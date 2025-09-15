@@ -10,11 +10,15 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
+import { useModelProvider } from '@/hooks/useModelProvider'
 import { useAppState } from '@/hooks/useAppState'
 import { useChat } from '@/hooks/useChat'
 import { useThreads } from '@/hooks/useThreads'
 import { useRouter } from '@tanstack/react-router'
 import { route } from '@/constants/routes'
+import DropdownModelProvider from '@/containers/DropdownModelProvider'
+import { ModelLoader } from '@/containers/loaders/ModelLoader'
+import { defaultModel } from '@/lib/models'
 
 type BSPInputProps = {
   className?: string
@@ -23,7 +27,7 @@ type BSPInputProps = {
   initialMessage?: boolean
 }
 
-const BSPInput = ({ className, model }: BSPInputProps) => {
+const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
   const [prompt, setPrompt] = useState('')
@@ -34,6 +38,8 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
   
   const { streamingContent } = useAppState()
   const { spellCheckChatInput } = useGeneralSetting()
+  const { selectedModel, selectedProvider } = useModelProvider()
+  const { loadingModel } = useAppState()
 
   const maxRows = 10
 
@@ -74,8 +80,8 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
               } else {
                 const newThread = await createThread(
                   {
-                    id: model?.id ?? 'gpt-4o-mini',
-                    provider: model?.provider ?? 'openai',
+                    id: selectedModel?.id ?? defaultModel(selectedProvider),
+                    provider: selectedProvider,
                   },
                   `BSP Variation ${i + 1}`
                 )
@@ -116,8 +122,8 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
       variableCount,
       sendMessage,
       createThread,
-      model?.id,
-      model?.provider,
+      selectedModel?.id,
+      selectedProvider,
       router,
     ]
   )
@@ -164,7 +170,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Ask gpt-4o-mini. Use /var for variables"
+            placeholder="Type your prompt. Use /var for variables"
             className={cn(
               'w-full resize-none border-0 bg-transparent px-4 py-4 text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-0 relative z-10 text-base',
               spellCheckChatInput ? '' : 'spellcheck="false"'
@@ -185,21 +191,15 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
                 streamingContent && 'opacity-50 pointer-events-none'
               )}
             >
-              {/* Model indicator */}
-              <div className="flex items-center gap-2 px-2 py-1 bg-main-view-fg/10 rounded-md">
-                <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <span className="text-sm text-main-view-fg/70 font-medium">
-                  gpt-4o-mini
-                </span>
-                <div className="w-4 h-4 p-0.5 hover:bg-main-view-fg/20 rounded cursor-pointer transition-colors">
-                  <svg className="w-full h-full text-main-view-fg/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-              </div>
+              {/* Model selector (same as New Chat) */}
+              {model?.provider === 'llamacpp' && loadingModel ? (
+                <ModelLoader />
+              ) : (
+                <DropdownModelProvider
+                  model={model}
+                  useLastUsedModel={initialMessage}
+                />
+              )}
             </div>
           </div>
 
