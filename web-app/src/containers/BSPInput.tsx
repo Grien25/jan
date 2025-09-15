@@ -19,13 +19,11 @@ import { useModelProvider } from '@/hooks/useModelProvider'
 import { useAppState } from '@/hooks/useAppState'
 import { useChat } from '@/hooks/useChat'
 import { useThreads } from '@/hooks/useThreads'
-import { useMessages } from '@/hooks/useMessages'
 import { useRouter } from '@tanstack/react-router'
 import { route } from '@/constants/routes'
 import DropdownModelProvider from '@/containers/DropdownModelProvider'
 import { ModelLoader } from '@/containers/loaders/ModelLoader'
 import { defaultModel } from '@/lib/models'
-import { ThreadMessage } from '@janhq/core'
 import {
   Tooltip,
   TooltipContent,
@@ -60,14 +58,12 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
   const maxRows = 10
 
   const { sendMessage } = useChat()
-  const { createThread, getCurrentThread } = useThreads()
-  const { getMessages } = useMessages()
+  const { createThread } = useThreads()
   const router = useRouter()
   const [dropdownToolsAvailable, setDropdownToolsAvailable] = useState(false)
   const [tooltipToolsAvailable, setTooltipToolsAvailable] = useState(false)
   const [connectedServers, setConnectedServers] = useState<string[]>([])
   const [hasMmproj, setHasMmproj] = useState(false)
-  const [saveAsMarkdownMode, setSaveAsMarkdownMode] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<
     Array<{
       name: string
@@ -163,86 +159,6 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
     if (textareaRef.current) textareaRef.current.focus()
   }
 
-  // Helper: extract text from thread message content
-  type TextPart = { type: 'text'; text?: { value?: string } }
-  type ImagePart = { type: 'image'; image_url?: { url?: string } }
-  type ContentPart = TextPart | ImagePart | { type: string }
-
-  const getTextFromMessage = (msg?: ThreadMessage): string => {
-    if (!msg || !Array.isArray(msg.content)) return ''
-    return msg.content
-      .map((part: ContentPart) => {
-        if (part.type === 'text' && part.text?.value) return part.text.value
-        if (part.type === 'image' && part.image_url?.url) return `![image](${part.image_url.url})`
-        return ''
-      })
-      .filter(Boolean)
-      .join('\n\n')
-  }
-
-  // Helper: save the last user/assistant exchange as markdown
-  const saveLastExchangeAsMarkdown = async (baseName: string) => {
-    try {
-      const current = await getCurrentThread()
-      if (!current?.id) return
-      const messages = getMessages(current.id)
-      if (!messages.length) return
-      // Assume last two are user then assistant for this exchange
-      const last = messages[messages.length - 1]
-      const prev = messages[messages.length - 2]
-      // Find last user message
-      let userMsg = prev && prev.role === 'user' ? prev : undefined
-      if (!userMsg) {
-        for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].role === 'user') {
-            userMsg = messages[i]
-            break
-          }
-        }
-      }
-      // Find last assistant message
-      let assistantMsg = last && last.role === 'assistant' ? last : undefined
-      if (!assistantMsg) {
-        for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].role === 'assistant') {
-            assistantMsg = messages[i]
-            break
-          }
-        }
-      }
-
-      const userText = getTextFromMessage(userMsg)
-      const assistantText = getTextFromMessage(assistantMsg)
-      const md = `# BSP Export\n\n## Prompt\n\n${userText}\n\n---\n\n## Response\n\n${assistantText}\n`
-
-      if (IS_WEB_APP) {
-        // Fallback for web: trigger download
-        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${baseName}.md`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        return
-      }
-
-      // Desktop (Tauri): save to Documents/BSP
-      const { documentDir, join } = await import('@tauri-apps/api/path')
-      const docs = await documentDir()
-      const targetDir = await join(docs, 'BSP')
-      // Ensure directory exists
-      await serviceHub.core().invoke('mkdir', { args: [targetDir] })
-      const filePath = await join(targetDir, `${baseName}.md`)
-      await serviceHub.core().invoke('write_file_sync', { args: [filePath, md] })
-    } catch (error) {
-      console.error('Failed to save markdown:', error)
-      setMessage('Failed to save markdown to Documents/BSP')
-    }
-  }
-
   // Check for connected MCP servers
   useEffect(() => {
     const checkConnectedServers = async () => {
@@ -298,32 +214,22 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
                   uploadedFiles.length > 0 ? uploadedFiles : undefined
                 )
               } else {
-                if (saveAsMarkdownMode) {
-                  // Stay in current thread, send and save last exchange as markdown
-                  await sendMessage(
-                    msg,
-                    true,
-                    uploadedFiles.length > 0 ? uploadedFiles : undefined
-                  )
-                  await saveLastExchangeAsMarkdown(`BSP Variation ${i + 1}`)
-                } else {
-                  const newThread = await createThread(
-                    {
-                      id: selectedModel?.id ?? defaultModel(selectedProvider),
-                      provider: selectedProvider,
-                    },
-                    `BSP Variation ${i + 1}`
-                  )
-                  await router.navigate({
-                    to: route.threadsDetail,
-                    params: { threadId: newThread.id },
-                  })
-                  await sendMessage(
-                    msg,
-                    true,
-                    uploadedFiles.length > 0 ? uploadedFiles : undefined
-                  )
-                }
+                const newThread = await createThread(
+                  {
+                    id: selectedModel?.id ?? defaultModel(selectedProvider),
+                    provider: selectedProvider,
+                  },
+                  `BSP Variation ${i + 1}`
+                )
+                await router.navigate({
+                  to: route.threadsDetail,
+                  params: { threadId: newThread.id },
+                })
+                await sendMessage(
+                  msg,
+                  true,
+                  uploadedFiles.length > 0 ? uploadedFiles : undefined
+                )
               }
             }
             // Reset local UI state after batch finishes
@@ -412,6 +318,7 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
                     )}
                   >
                     {file.type.startsWith('image/') && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         className="object-cover w-full h-full rounded-lg"
                         src={file.dataUrl}
@@ -621,7 +528,7 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
       {/* Variable Input Boxes */}
       {prompt.includes('/var') && (
         <div className="mt-4 space-y-3">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-1 bg-main-view-fg/10 rounded-md p-1 border border-main-view-fg/20">
               <Button
                 variant="default"
@@ -645,28 +552,6 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
                 <ChevronUp className="h-3 w-3" />
               </Button>
             </div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={saveAsMarkdownMode ? 'default' : null}
-                    size="sm"
-                    className={cn(
-                      'h-6 px-2 py-0 text-xs rounded-sm',
-                      saveAsMarkdownMode
-                        ? 'bg-accent text-accent-fg'
-                        : 'bg-main-view-fg/10 border border-main-view-fg/20 text-main-view-fg/80 hover:bg-main-view-fg/15'
-                    )}
-                    onClick={() => setSaveAsMarkdownMode((s) => !s)}
-                  >
-                    SAMD
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Save As Markdown (Documents/BSP)</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
