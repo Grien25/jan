@@ -2,27 +2,16 @@
 
 import TextareaAutosize from 'react-textarea-autosize'
 import { cn } from '@/lib/utils'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { ArrowRight, ChevronUp, ChevronDown } from 'lucide-react'
 import {
-  IconPhoto,
   IconPlayerStopFilled,
   IconX,
 } from '@tabler/icons-react'
-import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
-import { useModelProvider } from '@/hooks/useModelProvider'
 import { useAppState } from '@/hooks/useAppState'
 import { useChat } from '@/hooks/useChat'
-import DropdownModelProvider from '@/containers/DropdownModelProvider'
-import { ModelLoader } from '@/containers/loaders/ModelLoader'
 
 type BSPInputProps = {
   className?: string
@@ -31,7 +20,7 @@ type BSPInputProps = {
   initialMessage?: boolean
 }
 
-const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
+const BSPInput = ({ className }: BSPInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
   const [prompt, setPrompt] = useState('')
@@ -41,14 +30,11 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
   
   const {
     streamingContent,
-    loadingModel,
   } = useAppState()
-  const { t } = useTranslation()
   const { spellCheckChatInput } = useGeneralSetting()
 
   const maxRows = 10
 
-  const { selectedModel } = useModelProvider()
   const { sendMessage } = useChat()
   const [uploadedFiles, setUploadedFiles] = useState<
     Array<{
@@ -59,16 +45,6 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
       dataUrl: string
     }>
   >([])
-  const [hasMmproj, setHasMmproj] = useState(false)
-
-  // Check if model has mmproj support
-  useEffect(() => {
-    if (selectedModel && 'mmproj' in selectedModel) {
-      setHasMmproj(true)
-    } else {
-      setHasMmproj(false)
-    }
-  }, [selectedModel])
 
   const handleSendMesage = useCallback(
     async (message: string) => {
@@ -130,11 +106,11 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
 
 
   return (
-    <div className={cn('relative w-full', className)}>
+    <div className={cn('relative w-full max-w-2xl mx-auto', className)}>
       <div
         className={cn(
-          'relative flex flex-col w-full rounded-lg border border-main-view-fg/20 bg-main-view-fg/5 transition-all duration-200 ease-in-out',
-          isFocused && 'border-main-view-fg/40 bg-main-view-fg/10'
+          'relative flex flex-col w-full rounded-xl border border-main-view-fg/20 bg-main-view-fg/5 transition-all duration-200 ease-in-out shadow-sm',
+          isFocused && 'border-main-view-fg/40 bg-main-view-fg/10 shadow-md'
         )}
       >
         <div className="relative flex-1">
@@ -172,9 +148,9 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Ask me anything... Use /var for variables"
+            placeholder="Ask gpt-4o-mini. Use /var for variables"
             className={cn(
-              'w-full resize-none border-0 bg-transparent px-4 py-3 text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-0 relative z-10',
+              'w-full resize-none border-0 bg-transparent px-4 py-4 text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-0 relative z-10 text-base',
               spellCheckChatInput ? '' : 'spellcheck="false"'
             )}
             maxRows={maxRows}
@@ -185,77 +161,64 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
           />
         </div>
 
-        <div className="absolute z-20 bg-transparent bottom-0 w-full p-2 ">
-          <div className="flex justify-between items-center w-full">
-            <div className="px-1 flex items-center gap-1">
-              <div
-                className={cn(
-                  'px-1 flex items-center',
-                  streamingContent && 'opacity-50 pointer-events-none'
-                )}
-              >
-                {model?.provider === 'llamacpp' && loadingModel ? (
-                  <ModelLoader />
-                ) : (
-                  <DropdownModelProvider
-                    model={model}
-                    useLastUsedModel={initialMessage}
-                  />
-                )}
-                {/* File attachment - show only for models with mmproj */}
-                {hasMmproj && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="h-7 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1"
-                        >
-                          <IconPhoto
-                            size={18}
-                            className="text-main-view-fg/50"
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{t('vision')}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+        <div className="flex items-center justify-between w-full p-3 border-t border-main-view-fg/10">
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                'flex items-center gap-2',
+                streamingContent && 'opacity-50 pointer-events-none'
+              )}
+            >
+              {/* Model indicator */}
+              <div className="flex items-center gap-2 px-2 py-1 bg-main-view-fg/10 rounded-md">
+                <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <span className="text-sm text-main-view-fg/70 font-medium">
+                  gpt-4o-mini
+                </span>
+                <div className="w-4 h-4 p-0.5 hover:bg-main-view-fg/20 rounded cursor-pointer transition-colors">
+                  <svg className="w-full h-full text-main-view-fg/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
               </div>
             </div>
-
-            {streamingContent ? (
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() =>
-                  // stopStreaming(currentThreadId ?? streamingContent.thread_id)
-                  console.log('Stop streaming')
-                }
-              >
-                <IconPlayerStopFilled />
-              </Button>
-            ) : (
-              <Button
-                variant={
-                  !prompt.trim() && uploadedFiles.length === 0
-                    ? null
-                    : 'default'
-                }
-                size="icon"
-                disabled={!prompt.trim() && uploadedFiles.length === 0}
-                data-test-id="send-message-button"
-                onClick={() => handleSendMesage(prompt)}
-              >
-                {streamingContent ? (
-                  <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                ) : (
-                  <ArrowRight className="text-primary-fg" />
-                )}
-              </Button>
-            )}
           </div>
+
+          {streamingContent ? (
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() =>
+                // stopStreaming(currentThreadId ?? streamingContent.thread_id)
+                console.log('Stop streaming')
+              }
+            >
+              <IconPlayerStopFilled className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant={
+                !prompt.trim() && uploadedFiles.length === 0
+                  ? null
+                  : 'default'
+              }
+              size="icon"
+              className="h-8 w-8"
+              disabled={!prompt.trim() && uploadedFiles.length === 0}
+              data-test-id="send-message-button"
+              onClick={() => handleSendMesage(prompt)}
+            >
+              {streamingContent ? (
+                <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
