@@ -646,9 +646,14 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={saveAsMarkdownMode ? 'default' : 'secondary'}
+                    variant={saveAsMarkdownMode ? 'default' : null}
                     size="sm"
-                    className={cn('h-6 px-2 py-0 text-xs', saveAsMarkdownMode && 'bg-accent text-accent-fg')}
+                    className={cn(
+                      'h-6 px-2 py-0 text-xs rounded-sm',
+                      saveAsMarkdownMode
+                        ? 'bg-accent text-accent-fg'
+                        : 'bg-main-view-fg/10 border border-main-view-fg/20 text-main-view-fg/80 hover:bg-main-view-fg/15'
+                    )}
                     onClick={() => setSaveAsMarkdownMode((s) => !s)}
                   >
                     SAMD
