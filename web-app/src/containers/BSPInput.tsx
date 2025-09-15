@@ -30,6 +30,7 @@ import DropdownModelProvider from '@/containers/DropdownModelProvider'
 import { ModelLoader } from '@/containers/loaders/ModelLoader'
 import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
 import { useServiceHub } from '@/hooks/useServiceHub'
+import { useThreads } from '@/hooks/useThreads'
 
 type BSPInputProps = {
   className?: string
