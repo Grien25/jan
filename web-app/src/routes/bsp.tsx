@@ -14,6 +14,7 @@ export const Route = createFileRoute(route.bsp as any)({
 function BSP() {
   const { t } = useTranslation()
   const { providers } = useModelProvider()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const search = useSearch({ from: route.bsp as any })
   const selectedModel = search.model
 
