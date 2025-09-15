@@ -56,7 +56,12 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
 
   // Monitor streaming completion and process batch queue
   useEffect(() => {
-    if (isProcessingBatch && !streamingContent && batchQueue.length > 0) {
+    console.log('BSP Debug - streamingContent:', streamingContent)
+    console.log('BSP Debug - isProcessingBatch:', isProcessingBatch)
+    console.log('BSP Debug - batchQueue.length:', batchQueue.length)
+    
+    if (isProcessingBatch && (!streamingContent || !streamingContent.thread_id) && batchQueue.length > 0) {
+      console.log('BSP Debug - Processing next batch item')
       // Streaming just finished, process next item in queue
       const nextMessage = batchQueue[0]
       const remainingQueue = batchQueue.slice(1)
@@ -70,6 +75,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
           },
           `BSP Variation ${currentBatchIndex + 2}`
         ).then((newThread) => {
+          console.log('BSP Debug - Created new thread:', newThread.id)
           // Navigate to new thread
           router.navigate({
             to: route.threadsDetail,
@@ -78,6 +84,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
           
           // Send message to new thread
           setTimeout(() => {
+            console.log('BSP Debug - Sending message to new thread:', nextMessage)
             sendMessage(nextMessage, true)
           }, 100)
           
@@ -91,6 +98,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
         })
       } else {
         // All messages processed
+        console.log('BSP Debug - All messages processed')
         setIsProcessingBatch(false)
         setBatchQueue([])
         setCurrentBatchIndex(0)
@@ -114,6 +122,8 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
           
           // Send first message immediately
           const firstMessage = batchMessages[0]
+          console.log('BSP Debug - Sending first message:', firstMessage)
+          console.log('BSP Debug - Batch messages:', batchMessages)
           try {
             await sendMessage(firstMessage)
             setPrompt('')
@@ -122,6 +132,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
             
             // If there are more messages, queue them for batch processing
             if (batchMessages.length > 1) {
+              console.log('BSP Debug - Queueing remaining messages:', batchMessages.slice(1))
               setBatchQueue(batchMessages.slice(1))
               setCurrentBatchIndex(0)
               setIsProcessingBatch(true)
