@@ -30,13 +30,9 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
   const [variables, setVariables] = useState<string[]>(['', '', '', ''])
   const [variableCount, setVariableCount] = useState(2)
   const [message, setMessage] = useState('')
-  const [isProcessingBatch, setIsProcessingBatch] = useState(false)
-  const [batchQueue, setBatchQueue] = useState<string[]>([])
-  const [currentBatchIndex, setCurrentBatchIndex] = useState(0)
+  // Batch processing handled sequentially via await, no extra state
   
-  const {
-    streamingContent,
-  } = useAppState()
+  const { streamingContent } = useAppState()
   const { spellCheckChatInput } = useGeneralSetting()
 
   const maxRows = 10
@@ -54,57 +50,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
     }>
   >([])
 
-  // Monitor streaming completion and process batch queue
-  useEffect(() => {
-    console.log('BSP Debug - streamingContent:', streamingContent)
-    console.log('BSP Debug - isProcessingBatch:', isProcessingBatch)
-    console.log('BSP Debug - batchQueue.length:', batchQueue.length)
-    
-    if (isProcessingBatch && (!streamingContent || !streamingContent.thread_id) && batchQueue.length > 0) {
-      console.log('BSP Debug - Processing next batch item')
-      // Streaming just finished, process next item in queue
-      const nextMessage = batchQueue[0]
-      const remainingQueue = batchQueue.slice(1)
-      
-      if (remainingQueue.length > 0) {
-        // Create new thread for next message
-        createThread(
-          {
-            id: model?.id ?? 'gpt-4o-mini',
-            provider: model?.provider ?? 'openai',
-          },
-          `BSP Variation ${currentBatchIndex + 2}`
-        ).then((newThread) => {
-          console.log('BSP Debug - Created new thread:', newThread.id)
-          // Navigate to new thread
-          router.navigate({
-            to: route.threadsDetail,
-            params: { threadId: newThread.id },
-          })
-          
-          // Send message to new thread
-          setTimeout(() => {
-            console.log('BSP Debug - Sending message to new thread:', nextMessage)
-            sendMessage(nextMessage, true)
-          }, 100)
-          
-          // Update state
-          setBatchQueue(remainingQueue)
-          setCurrentBatchIndex(currentBatchIndex + 1)
-        }).catch((error) => {
-          console.error('Error creating thread for batch:', error)
-          setMessage('Failed to create thread for batch processing')
-          setIsProcessingBatch(false)
-        })
-      } else {
-        // All messages processed
-        console.log('BSP Debug - All messages processed')
-        setIsProcessingBatch(false)
-        setBatchQueue([])
-        setCurrentBatchIndex(0)
-      }
-    }
-  }, [streamingContent, isProcessingBatch, batchQueue, currentBatchIndex, createThread, router, model, sendMessage])
+  // Removed effect-based batch chaining; handled sequentially in send flow
 
   const handleSendMesage = useCallback(
     async (message: string) => {
@@ -119,27 +65,34 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
           const batchMessages = activeVariables.map(variable => 
             message.replace(/\/var/g, variable)
           )
-          
-          // Send first message immediately
-          const firstMessage = batchMessages[0]
-          console.log('BSP Debug - Sending first message:', firstMessage)
-          console.log('BSP Debug - Batch messages:', batchMessages)
           try {
-            await sendMessage(firstMessage)
+            // Send each variation sequentially, creating a new thread for each after the first
+            for (let i = 0; i < batchMessages.length; i++) {
+              const msg = batchMessages[i]
+              if (i === 0) {
+                await sendMessage(msg)
+              } else {
+                const newThread = await createThread(
+                  {
+                    id: model?.id ?? 'gpt-4o-mini',
+                    provider: model?.provider ?? 'openai',
+                  },
+                  `BSP Variation ${i + 1}`
+                )
+                await router.navigate({
+                  to: route.threadsDetail,
+                  params: { threadId: newThread.id },
+                })
+                await sendMessage(msg)
+              }
+            }
+            // Reset local UI state after batch finishes
             setPrompt('')
             setUploadedFiles([])
             setMessage('')
-            
-            // If there are more messages, queue them for batch processing
-            if (batchMessages.length > 1) {
-              console.log('BSP Debug - Queueing remaining messages:', batchMessages.slice(1))
-              setBatchQueue(batchMessages.slice(1))
-              setCurrentBatchIndex(0)
-              setIsProcessingBatch(true)
-            }
           } catch (error) {
-            console.error('Error sending message:', error)
-            setMessage('Failed to send message. Please try again.')
+            console.error('Error sending batch messages:', error)
+            setMessage('Failed to process batch. Please try again.')
           }
         } else {
           setMessage('Please provide at least one variable value.')
@@ -162,6 +115,10 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
       variables,
       variableCount,
       sendMessage,
+      createThread,
+      model?.id,
+      model?.provider,
+      router,
     ]
   )
 
@@ -199,33 +156,7 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
         )}
       >
         <div className="relative flex-1">
-          {/* Highlighting overlay */}
-          {prompt && (
-            <div 
-              className="absolute inset-0 px-4 py-3 pointer-events-none whitespace-pre-wrap break-words"
-              style={{ 
-                fontFamily: 'inherit',
-                fontSize: 'inherit',
-                lineHeight: 'inherit',
-                color: 'transparent'
-              }}
-            >
-              {prompt.split(/(\/var)/g).map((part, index) => {
-                if (part === '/var') {
-                  return (
-                    <span
-                      key={index}
-                      className="bg-blue-500/20 text-blue-400 px-1 rounded"
-                    >
-                      {part}
-                    </span>
-                  )
-                }
-                return part
-              })}
-            </div>
-          )}
-          
+          {/* Removed overlay rectangles highlighting /var for cleaner UI */}
           <TextareaAutosize
             ref={textareaRef}
             value={prompt}
@@ -293,11 +224,11 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
               }
               size="icon"
               className="h-8 w-8"
-              disabled={!prompt.trim() && uploadedFiles.length === 0 || isProcessingBatch}
+              disabled={!prompt.trim() && uploadedFiles.length === 0}
               data-test-id="send-message-button"
               onClick={() => handleSendMesage(prompt)}
             >
-              {streamingContent || isProcessingBatch ? (
+              {streamingContent ? (
                 <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
               ) : (
                 <ArrowRight className="h-4 w-4" />
@@ -307,58 +238,35 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
         </div>
       </div>
 
-      {/* Batch Processing Status */}
-      {isProcessingBatch && (
-        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <div className="flex items-center gap-2">
-            <span className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-            <span className="text-sm text-blue-400">
-              Processing batch: {batchQueue.length + 1} variations remaining...
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Variable Input Boxes */}
       {prompt.includes('/var') && (
-        <div className="mt-4 p-4 bg-main-view-fg/5 rounded-lg border border-main-view-fg/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-main-view-fg">
-                Variable Values
-              </h3>
-              <p className="text-xs text-main-view-fg/60">
-                Replace /var with these values (max 10 characters each)
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-main-view-fg/50">Count:</span>
-              <div className="flex items-center gap-1 bg-main-view-fg/10 rounded-md p-1">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleVariableCountChange(variableCount - 1)}
-                  disabled={variableCount <= 2}
-                  className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
-                >
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-                <span className="text-sm font-medium w-4 text-center text-main-view-fg">
-                  {variableCount}
-                </span>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleVariableCountChange(variableCount + 1)}
-                  disabled={variableCount >= 4}
-                  className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
-                >
-                  <ChevronUp className="h-3 w-3" />
-                </Button>
-              </div>
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-end">
+            <div className="flex items-center gap-1 bg-main-view-fg/10 rounded-md p-1 border border-main-view-fg/20">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleVariableCountChange(variableCount - 1)}
+                disabled={variableCount <= 2}
+                className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              <span className="text-sm font-medium w-4 text-center text-main-view-fg">
+                {variableCount}
+              </span>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleVariableCountChange(variableCount + 1)}
+                disabled={variableCount >= 4}
+                className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
+              >
+                <ChevronUp className="h-3 w-3" />
+              </Button>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: variableCount }, (_, index) => (
               <div key={index} className="relative">
@@ -376,18 +284,6 @@ const BSPInput = ({ className, model }: BSPInputProps) => {
               </div>
             ))}
           </div>
-          
-          {variables.slice(0, variableCount).some(v => v.trim()) && (
-            <div className="mt-3 p-2 bg-main-view-fg/5 rounded border border-main-view-fg/10">
-              <p className="text-xs text-main-view-fg/60 mb-1">Preview:</p>
-              <p className="text-sm text-main-view-fg">
-                {prompt.replace(/\/var/g, (_, offset) => {
-                  const varIndex = prompt.substring(0, offset).split('/var').length - 1
-                  return variables[varIndex % variableCount] || '/var'
-                })}
-              </p>
-            </div>
-          )}
         </div>
       )}
 
