@@ -173,24 +173,6 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
     }
   }
 
-  const renderPromptWithHighlighting = () => {
-    if (!prompt) return null
-    
-    const parts = prompt.split(/(\/var)/g)
-    return parts.map((part, index) => {
-      if (part === '/var') {
-        return (
-          <span
-            key={index}
-            className="bg-blue-500/20 text-blue-400 px-1 rounded"
-          >
-            {part}
-          </span>
-        )
-      }
-      return part
-    })
-  }
 
   return (
     <div className={cn('relative w-full', className)}>
@@ -202,6 +184,33 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
         )}
       >
         <div className="relative flex-1">
+          {/* Highlighting overlay */}
+          {prompt && (
+            <div 
+              className="absolute inset-0 px-4 py-3 pointer-events-none whitespace-pre-wrap break-words"
+              style={{ 
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit',
+                color: 'transparent'
+              }}
+            >
+              {prompt.split(/(\/var)/g).map((part, index) => {
+                if (part === '/var') {
+                  return (
+                    <span
+                      key={index}
+                      className="bg-blue-500/20 text-blue-400 px-1 rounded"
+                    >
+                      {part}
+                    </span>
+                  )
+                }
+                return part
+              })}
+            </div>
+          )}
+          
           <TextareaAutosize
             ref={textareaRef}
             value={prompt}
@@ -211,7 +220,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
             onBlur={() => setIsFocused(false)}
             placeholder="Ask me anything... Use /var for variables"
             className={cn(
-              'w-full resize-none border-0 bg-transparent px-4 py-3 text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-0',
+              'w-full resize-none border-0 bg-transparent px-4 py-3 text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-0 relative z-10',
               spellCheckChatInput ? '' : 'spellcheck="false"'
             )}
             maxRows={maxRows}
@@ -299,24 +308,29 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
 
       {/* Variable Input Boxes */}
       {prompt.includes('/var') && (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 p-4 bg-main-view-fg/5 rounded-lg border border-main-view-fg/10 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-main-view-fg/70">
-              Variable Values (max 10 characters each)
-            </h3>
+            <div>
+              <h3 className="text-sm font-medium text-main-view-fg">
+                Variable Values
+              </h3>
+              <p className="text-xs text-main-view-fg/60">
+                Replace /var with these values (max 10 characters each)
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-main-view-fg/50">Count:</span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 bg-main-view-fg/10 rounded-md p-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleVariableCountChange(variableCount - 1)}
                   disabled={variableCount <= 2}
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </Button>
-                <span className="text-sm font-medium w-4 text-center">
+                <span className="text-sm font-medium w-4 text-center text-main-view-fg">
                   {variableCount}
                 </span>
                 <Button
@@ -324,7 +338,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
                   size="sm"
                   onClick={() => handleVariableCountChange(variableCount + 1)}
                   disabled={variableCount >= 4}
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 hover:bg-main-view-fg/20"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </Button>
@@ -334,17 +348,33 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
           
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: variableCount }, (_, index) => (
-              <input
-                key={index}
-                type="text"
-                value={variables[index] || ''}
-                onChange={(e) => handleVariableChange(index, e.target.value)}
-                placeholder={`Variable ${index + 1}`}
-                maxLength={10}
-                className="w-full px-3 py-2 text-sm bg-main-view-fg/5 border border-main-view-fg/20 rounded-md text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
-              />
+              <div key={index} className="relative">
+                <input
+                  type="text"
+                  value={variables[index] || ''}
+                  onChange={(e) => handleVariableChange(index, e.target.value)}
+                  placeholder={`Variable ${index + 1}`}
+                  maxLength={10}
+                  className="w-full px-3 py-2 text-sm bg-main-view-fg/10 border border-main-view-fg/20 rounded-md text-main-view-fg placeholder:text-main-view-fg/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
+                />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">{index + 1}</span>
+                </div>
+              </div>
             ))}
           </div>
+          
+          {variables.slice(0, variableCount).some(v => v.trim()) && (
+            <div className="mt-3 p-2 bg-main-view-fg/5 rounded border border-main-view-fg/10">
+              <p className="text-xs text-main-view-fg/60 mb-1">Preview:</p>
+              <p className="text-sm text-main-view-fg">
+                {prompt.replace(/\/var/g, (match, offset) => {
+                  const varIndex = prompt.substring(0, offset).split('/var').length - 1
+                  return variables[varIndex % variableCount] || '/var'
+                })}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
