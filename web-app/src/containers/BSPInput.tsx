@@ -13,10 +13,6 @@ import {
 import { ArrowRight, ChevronUp, ChevronDown } from 'lucide-react'
 import {
   IconPhoto,
-  IconWorld,
-  IconAtom,
-  IconTool,
-  IconCodeCircle2,
   IconPlayerStopFilled,
   IconX,
 } from '@tabler/icons-react'
@@ -24,13 +20,9 @@ import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
 import { useModelProvider } from '@/hooks/useModelProvider'
 import { useAppState } from '@/hooks/useAppState'
-import { MovingBorder } from './MovingBorder'
 import { useChat } from '@/hooks/useChat'
 import DropdownModelProvider from '@/containers/DropdownModelProvider'
 import { ModelLoader } from '@/containers/loaders/ModelLoader'
-import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
-import { useServiceHub } from '@/hooks/useServiceHub'
-import { useThreads } from '@/hooks/useThreads'
 
 type BSPInputProps = {
   className?: string
@@ -42,30 +34,22 @@ type BSPInputProps = {
 const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
-  const [rows, setRows] = useState(1)
   const [prompt, setPrompt] = useState('')
   const [variables, setVariables] = useState<string[]>(['', '', '', ''])
   const [variableCount, setVariableCount] = useState(2)
   const [message, setMessage] = useState('')
   
-  const serviceHub = useServiceHub()
   const {
     streamingContent,
-    abortControllers,
     loadingModel,
-    tools,
-    cancelToolCall,
   } = useAppState()
-  const { currentThreadId } = useThreads()
   const { t } = useTranslation()
   const { spellCheckChatInput } = useGeneralSetting()
 
   const maxRows = 10
 
-  const { selectedModel, selectedProvider } = useModelProvider()
+  const { selectedModel } = useModelProvider()
   const { sendMessage } = useChat()
-  const [dropdownToolsAvailable, setDropdownToolsAvailable] = useState(false)
-  const [tooltipToolsAvailable, setTooltipToolsAvailable] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<
     Array<{
       name: string
@@ -75,33 +59,11 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
       dataUrl: string
     }>
   >([])
-  const [connectedServers, setConnectedServers] = useState<string[]>([])
-  const [isDragOver, setIsDragOver] = useState(false)
   const [hasMmproj, setHasMmproj] = useState(false)
-
-  // Check for connected MCP servers
-  useEffect(() => {
-    const checkConnectedServers = async () => {
-      try {
-        const servers = await serviceHub.mcp().getConnectedServers()
-        setConnectedServers(servers)
-      } catch (error) {
-        console.error('Failed to get connected servers:', error)
-        setConnectedServers([])
-      }
-    }
-
-    checkConnectedServers()
-
-    // Poll for connected servers every 3 seconds
-    const intervalId = setInterval(checkConnectedServers, 3000)
-
-    return () => clearInterval(intervalId)
-  }, [serviceHub])
 
   // Check if model has mmproj support
   useEffect(() => {
-    if (selectedModel?.mmproj) {
+    if (selectedModel && 'mmproj' in selectedModel) {
       setHasMmproj(true)
     } else {
       setHasMmproj(false)
@@ -125,12 +87,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
       }
 
       try {
-        await sendMessage({
-          message: processedMessage,
-          files: uploadedFiles,
-          model: selectedModel,
-          threadId: currentThreadId,
-        })
+        await sendMessage(processedMessage)
         setPrompt('')
         setUploadedFiles([])
         setMessage('')
@@ -140,13 +97,10 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
       }
     },
     [
-      message,
       uploadedFiles,
       variables,
       variableCount,
       sendMessage,
-      selectedModel,
-      currentThreadId,
     ]
   )
 
@@ -180,8 +134,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
       <div
         className={cn(
           'relative flex flex-col w-full rounded-lg border border-main-view-fg/20 bg-main-view-fg/5 transition-all duration-200 ease-in-out',
-          isFocused && 'border-main-view-fg/40 bg-main-view-fg/10',
-          isDragOver && 'border-primary/50 bg-primary/5'
+          isFocused && 'border-main-view-fg/40 bg-main-view-fg/10'
         )}
       >
         <div className="relative flex-1">
@@ -226,9 +179,8 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
             )}
             maxRows={maxRows}
             minRows={1}
-            onHeightChange={(height) => {
-              const newRows = Math.ceil(height / 24)
-              setRows(newRows)
+            onHeightChange={() => {
+              // Height change handled by TextareaAutosize
             }}
           />
         </div>
@@ -323,7 +275,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
               <span className="text-xs text-main-view-fg/50">Count:</span>
               <div className="flex items-center gap-1 bg-main-view-fg/10 rounded-md p-1">
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
                   onClick={() => handleVariableCountChange(variableCount - 1)}
                   disabled={variableCount <= 2}
@@ -335,7 +287,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
                   {variableCount}
                 </span>
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
                   onClick={() => handleVariableCountChange(variableCount + 1)}
                   disabled={variableCount >= 4}
@@ -369,7 +321,7 @@ const BSPInput = ({ model, className, initialMessage }: BSPInputProps) => {
             <div className="mt-3 p-2 bg-main-view-fg/5 rounded border border-main-view-fg/10">
               <p className="text-xs text-main-view-fg/60 mb-1">Preview:</p>
               <p className="text-sm text-main-view-fg">
-                {prompt.replace(/\/var/g, (match, offset) => {
+                {prompt.replace(/\/var/g, (_, offset) => {
                   const varIndex = prompt.substring(0, offset).split('/var').length - 1
                   return variables[varIndex % variableCount] || '/var'
                 })}
