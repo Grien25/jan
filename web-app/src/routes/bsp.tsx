@@ -80,28 +80,6 @@ function BSP() {
             />
           </div>
 
-          {/* Suggestion boxes */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
-            {[
-              "Write a story about /var",
-              "Explain /var in simple terms", 
-              "Create a recipe for /var",
-              "What are the benefits of /var?",
-              "How does /var work?",
-              "Tell me about /var history"
-            ].map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  // This would set the prompt in the input
-                  console.log('Suggestion clicked:', suggestion)
-                }}
-                className="p-3 bg-main-view-fg/5 border border-main-view-fg/10 rounded-lg text-left text-sm text-main-view-fg/70 hover:bg-main-view-fg/10 hover:border-main-view-fg/20 transition-all duration-200"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </div>

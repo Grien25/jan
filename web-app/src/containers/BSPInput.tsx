@@ -2,7 +2,7 @@
 
 import TextareaAutosize from 'react-textarea-autosize'
 import { cn } from '@/lib/utils'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, ChevronUp, ChevronDown } from 'lucide-react'
 import {
@@ -12,6 +12,9 @@ import {
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
 import { useAppState } from '@/hooks/useAppState'
 import { useChat } from '@/hooks/useChat'
+import { useThreads } from '@/hooks/useThreads'
+import { useRouter } from '@tanstack/react-router'
+import { route } from '@/constants/routes'
 
 type BSPInputProps = {
   className?: string
@@ -20,13 +23,16 @@ type BSPInputProps = {
   initialMessage?: boolean
 }
 
-const BSPInput = ({ className }: BSPInputProps) => {
+const BSPInput = ({ className, model }: BSPInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [variables, setVariables] = useState<string[]>(['', '', '', ''])
   const [variableCount, setVariableCount] = useState(2)
   const [message, setMessage] = useState('')
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false)
+  const [batchQueue, setBatchQueue] = useState<string[]>([])
+  const [currentBatchIndex, setCurrentBatchIndex] = useState(0)
   
   const {
     streamingContent,
@@ -36,6 +42,8 @@ const BSPInput = ({ className }: BSPInputProps) => {
   const maxRows = 10
 
   const { sendMessage } = useChat()
+  const { createThread } = useThreads()
+  const router = useRouter()
   const [uploadedFiles, setUploadedFiles] = useState<
     Array<{
       name: string
@@ -46,30 +54,96 @@ const BSPInput = ({ className }: BSPInputProps) => {
     }>
   >([])
 
+  // Monitor streaming completion and process batch queue
+  useEffect(() => {
+    if (isProcessingBatch && !streamingContent && batchQueue.length > 0) {
+      // Streaming just finished, process next item in queue
+      const nextMessage = batchQueue[0]
+      const remainingQueue = batchQueue.slice(1)
+      
+      if (remainingQueue.length > 0) {
+        // Create new thread for next message
+        createThread(
+          {
+            id: model?.id ?? 'gpt-4o-mini',
+            provider: model?.provider ?? 'openai',
+          },
+          `BSP Variation ${currentBatchIndex + 2}`
+        ).then((newThread) => {
+          // Navigate to new thread
+          router.navigate({
+            to: route.threadsDetail,
+            params: { threadId: newThread.id },
+          })
+          
+          // Send message to new thread
+          setTimeout(() => {
+            sendMessage(nextMessage, true)
+          }, 100)
+          
+          // Update state
+          setBatchQueue(remainingQueue)
+          setCurrentBatchIndex(currentBatchIndex + 1)
+        }).catch((error) => {
+          console.error('Error creating thread for batch:', error)
+          setMessage('Failed to create thread for batch processing')
+          setIsProcessingBatch(false)
+        })
+      } else {
+        // All messages processed
+        setIsProcessingBatch(false)
+        setBatchQueue([])
+        setCurrentBatchIndex(0)
+      }
+    }
+  }, [streamingContent, isProcessingBatch, batchQueue, currentBatchIndex, createThread, router, model, sendMessage])
+
   const handleSendMesage = useCallback(
     async (message: string) => {
       if (!message.trim() && uploadedFiles.length === 0) return
 
       // Replace /var with actual variables
-      let processedMessage = message
       const varMatches = message.match(/\/var/g)
       if (varMatches) {
         const activeVariables = variables.slice(0, variableCount).filter(v => v.trim())
         if (activeVariables.length > 0) {
-          // For now, just replace with the first variable
-          // Later we can implement batch processing
-          processedMessage = message.replace(/\/var/g, activeVariables[0])
+          // Create batch of messages with different variable values
+          const batchMessages = activeVariables.map(variable => 
+            message.replace(/\/var/g, variable)
+          )
+          
+          // Send first message immediately
+          const firstMessage = batchMessages[0]
+          try {
+            await sendMessage(firstMessage)
+            setPrompt('')
+            setUploadedFiles([])
+            setMessage('')
+            
+            // If there are more messages, queue them for batch processing
+            if (batchMessages.length > 1) {
+              setBatchQueue(batchMessages.slice(1))
+              setCurrentBatchIndex(0)
+              setIsProcessingBatch(true)
+            }
+          } catch (error) {
+            console.error('Error sending message:', error)
+            setMessage('Failed to send message. Please try again.')
+          }
+        } else {
+          setMessage('Please provide at least one variable value.')
         }
-      }
-
-      try {
-        await sendMessage(processedMessage)
-        setPrompt('')
-        setUploadedFiles([])
-        setMessage('')
-      } catch (error) {
-        console.error('Error sending message:', error)
-        setMessage('Failed to send message. Please try again.')
+      } else {
+        // No variables, send message normally
+        try {
+          await sendMessage(message)
+          setPrompt('')
+          setUploadedFiles([])
+          setMessage('')
+        } catch (error) {
+          console.error('Error sending message:', error)
+          setMessage('Failed to send message. Please try again.')
+        }
       }
     },
     [
@@ -208,11 +282,11 @@ const BSPInput = ({ className }: BSPInputProps) => {
               }
               size="icon"
               className="h-8 w-8"
-              disabled={!prompt.trim() && uploadedFiles.length === 0}
+              disabled={!prompt.trim() && uploadedFiles.length === 0 || isProcessingBatch}
               data-test-id="send-message-button"
               onClick={() => handleSendMesage(prompt)}
             >
-              {streamingContent ? (
+              {streamingContent || isProcessingBatch ? (
                 <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
               ) : (
                 <ArrowRight className="h-4 w-4" />
@@ -221,6 +295,18 @@ const BSPInput = ({ className }: BSPInputProps) => {
           )}
         </div>
       </div>
+
+      {/* Batch Processing Status */}
+      {isProcessingBatch && (
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+            <span className="text-sm text-blue-400">
+              Processing batch: {batchQueue.length + 1} variations remaining...
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Variable Input Boxes */}
       {prompt.includes('/var') && (
