@@ -164,10 +164,14 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
   }
 
   // Helper: extract text from thread message content
+  type TextPart = { type: 'text'; text?: { value?: string } }
+  type ImagePart = { type: 'image'; image_url?: { url?: string } }
+  type ContentPart = TextPart | ImagePart | { type: string }
+
   const getTextFromMessage = (msg?: ThreadMessage): string => {
     if (!msg || !Array.isArray(msg.content)) return ''
     return msg.content
-      .map((part: any) => {
+      .map((part: ContentPart) => {
         if (part.type === 'text' && part.text?.value) return part.text.value
         if (part.type === 'image' && part.image_url?.url) return `![image](${part.image_url.url})`
         return ''
@@ -187,28 +191,28 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
       const last = messages[messages.length - 1]
       const prev = messages[messages.length - 2]
       // Find last user message
-      let userMsg = prev && (prev as any).role === 'user' ? prev : undefined
+      let userMsg = prev && prev.role === 'user' ? prev : undefined
       if (!userMsg) {
         for (let i = messages.length - 1; i >= 0; i--) {
-          if ((messages[i] as any).role === 'user') {
+          if (messages[i].role === 'user') {
             userMsg = messages[i]
             break
           }
         }
       }
       // Find last assistant message
-      let assistantMsg = last && (last as any).role === 'assistant' ? last : undefined
+      let assistantMsg = last && last.role === 'assistant' ? last : undefined
       if (!assistantMsg) {
         for (let i = messages.length - 1; i >= 0; i--) {
-          if ((messages[i] as any).role === 'assistant') {
+          if (messages[i].role === 'assistant') {
             assistantMsg = messages[i]
             break
           }
         }
       }
 
-      const userText = getTextFromMessage(userMsg as any)
-      const assistantText = getTextFromMessage(assistantMsg as any)
+      const userText = getTextFromMessage(userMsg)
+      const assistantText = getTextFromMessage(assistantMsg)
       const md = `# BSP Export\n\n## Prompt\n\n${userText}\n\n---\n\n## Response\n\n${assistantText}\n`
 
       if (IS_WEB_APP) {
@@ -408,7 +412,6 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
                     )}
                   >
                     {file.type.startsWith('image/') && (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         className="object-cover w-full h-full rounded-lg"
                         src={file.dataUrl}
