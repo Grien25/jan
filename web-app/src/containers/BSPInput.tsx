@@ -2,7 +2,7 @@
 
 import TextareaAutosize from 'react-textarea-autosize'
 import { cn } from '@/lib/utils'
-import { useCallback, useRef, useState, useEffect } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, ChevronUp, ChevronDown } from 'lucide-react'
 import {
