@@ -186,8 +186,26 @@ const BSPInput = ({ className, model, initialMessage }: BSPInputProps) => {
       // Assume last two are user then assistant for this exchange
       const last = messages[messages.length - 1]
       const prev = messages[messages.length - 2]
-      const userMsg = prev?.role === 'user' ? prev : messages.findLast?.((m) => m.role === 'user') || prev
-      const assistantMsg = last?.role === 'assistant' ? last : messages.findLast?.((m) => m.role === 'assistant') || last
+      // Find last user message
+      let userMsg = prev && (prev as any).role === 'user' ? prev : undefined
+      if (!userMsg) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if ((messages[i] as any).role === 'user') {
+            userMsg = messages[i]
+            break
+          }
+        }
+      }
+      // Find last assistant message
+      let assistantMsg = last && (last as any).role === 'assistant' ? last : undefined
+      if (!assistantMsg) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if ((messages[i] as any).role === 'assistant') {
+            assistantMsg = messages[i]
+            break
+          }
+        }
+      }
 
       const userText = getTextFromMessage(userMsg as any)
       const assistantText = getTextFromMessage(assistantMsg as any)
